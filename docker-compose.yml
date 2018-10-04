@@ -1,2 +1,65 @@
-# docker-compose-nginx-php-fpm-mariadb-master-slave
-vxcv
+version: '3.5'
+services:
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    ports:
+      - '8080:8080'
+      - '443:443'
+    volumes:
+      - ./nginx:/etc/nginx/conf.d
+      - ./logs/nginx:/var/log/nginx
+      - ./wordpress:/var/www/html
+      - ./certs:/etc/letsencrypt
+      - ./certs-data:/data/letsencrypt
+    links:
+      - wordpress
+    restart: always
+
+db_master:
+    image: bitnami/mariadb:latest
+container_name: master
+    volumes:
+      - ./mysql:/var/lib/mysql
+    environment:
+    - MARIADB_ROOT_PASSWORD=password
+    - MARIADB_REPLICATION_MODE=master
+    - MARIADB_REPLICATION_USER=repl_user
+    - MARIADB_REPLICATION_PASSWORD=password
+    - MARIADB_USER=user
+    - MARIADB_PASSWORD=password
+    - MARIADB_DATABASE=wordpress
+    restart: always
+
+db_slave:
+    image: bitnami/mariadb:latest
+    container_name: slave
+    links:
+    - db_master
+    environment:
+    - MARIADB_MASTER_ROOT_PASSWORD=password
+    - MARIADB_REPLICATION_MODE=slave
+    - MARIADB_REPLICATION_USER=repl_user
+    - MARIADB_REPLICATION_PASSWORD=password
+    - MARIADB_MASTER_HOST=db_master
+    - MARIABD_MASTER_PORT=3306
+    - MARIADB_MASTER_USER=user
+    - MARIADB_MASTER_PASSWORD=password
+    - MARIADB_USER=user
+    - MARIADB_PASSWORD=password
+    - MARIADB_DATABASE=wordpress
+     restart: always
+
+wordpress:
+    image: wordpress:php7.2-fpm
+    container_name: wordpress
+    volumes:
+      - ./wordpress:/var/www/html
+    environment:
+      - WORDPRESS_DB_NAME=wordpress
+      - WORDPRESS_TABLE_PREFIX=wp_
+      - WORDPRESS_DB_HOST=db_master
+      - WORDPRESS_DB_PASSWORD=password
+    links:
+      - db_master
+    restart: always
